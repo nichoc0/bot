@@ -13,10 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app
 COPY main.py .
-# The service account file will be mounted at runtime to /app/serviceAccounts.json
 
-# Default env (can be overridden)
-ENV SA_PATH="/app/serviceAccounts.json"
+# Service account credentials now supplied via environment variables
 
 # Run
 CMD ["python", "main.py"]

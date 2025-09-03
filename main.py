@@ -33,15 +33,13 @@ PLACES = {"ieee", "mcgill", "ev", "home"}
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CALENDAR_ID = os.getenv("CALENDAR_ID")
-SA_PATH = os.getenv("SA_PATH", "/app/serviceAccounts.json")
-SERVICE_ACCOUNT_JSON = os.getenv("SERVICE_ACCOUNT_JSON")  # raw JSON string (not recommended if multiline issues)
+SERVICE_ACCOUNT_JSON = os.getenv("SERVICE_ACCOUNT_JSON")  # raw single-line JSON (minified)
 SERVICE_ACCOUNT_JSON_B64 = os.getenv("SERVICE_ACCOUNT_JSON_B64")  # base64 encoded JSON (preferred)
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 def _load_service_account_credentials():
-    """Load Firebase + Google creds from (priority): base64 env, raw env, file path."""
-    # 1. Base64 env
+    """Load Firebase + Google creds from env (base64 preferred). No file fallback."""
     if SERVICE_ACCOUNT_JSON_B64:
         try:
             decoded = base64.b64decode(SERVICE_ACCOUNT_JSON_B64).decode()
@@ -50,8 +48,8 @@ def _load_service_account_credentials():
             sa_gcal = SACredentials.from_service_account_info(sa_info, scopes=SCOPES)
             return cred_local, sa_gcal
         except Exception:
-            logging.exception("Failed decoding SERVICE_ACCOUNT_JSON_B64; falling back.")
-    # 2. Raw JSON env
+            logging.exception("Failed decoding SERVICE_ACCOUNT_JSON_B64.")
+            raise
     if SERVICE_ACCOUNT_JSON:
         try:
             sa_info = json.loads(SERVICE_ACCOUNT_JSON)
@@ -59,13 +57,9 @@ def _load_service_account_credentials():
             sa_gcal = SACredentials.from_service_account_info(sa_info, scopes=SCOPES)
             return cred_local, sa_gcal
         except Exception:
-            logging.exception("Failed parsing SERVICE_ACCOUNT_JSON; falling back to file.")
-    # 3. File path
-    if os.path.isdir(SA_PATH):
-        raise IsADirectoryError(f"SA_PATH points to a directory, expected file: {SA_PATH}")
-    cred_local = credentials.Certificate(SA_PATH)
-    sa_gcal = SACredentials.from_service_account_file(SA_PATH, scopes=SCOPES)
-    return cred_local, sa_gcal
+            logging.exception("Failed parsing SERVICE_ACCOUNT_JSON.")
+            raise
+    raise RuntimeError("No service account credentials supplied: set SERVICE_ACCOUNT_JSON_B64 or SERVICE_ACCOUNT_JSON")
 
 try:
     cred, sa_creds = _load_service_account_credentials()
