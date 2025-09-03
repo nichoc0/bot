@@ -1,5 +1,7 @@
 import os
 import logging
+import json
+import base64
 from datetime import datetime, timedelta, timezone
 
 import discord
@@ -27,15 +29,50 @@ GCAL_TIMEZONE = "UTC"
 PLACES = {"ieee", "mcgill", "ev", "home"}
 
 # ================== INIT ====================
+
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CALENDAR_ID = os.getenv("CALENDAR_ID")
-
-# Service account path (mounted in container)
 SA_PATH = os.getenv("SA_PATH", "/app/serviceAccounts.json")
+SERVICE_ACCOUNT_JSON = os.getenv("SERVICE_ACCOUNT_JSON")  # raw JSON string (not recommended if multiline issues)
+SERVICE_ACCOUNT_JSON_B64 = os.getenv("SERVICE_ACCOUNT_JSON_B64")  # base64 encoded JSON (preferred)
 
-# firebase
-cred = credentials.Certificate(SA_PATH)
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+def _load_service_account_credentials():
+    """Load Firebase + Google creds from (priority): base64 env, raw env, file path."""
+    # 1. Base64 env
+    if SERVICE_ACCOUNT_JSON_B64:
+        try:
+            decoded = base64.b64decode(SERVICE_ACCOUNT_JSON_B64).decode()
+            sa_info = json.loads(decoded)
+            cred_local = credentials.Certificate(sa_info)
+            sa_gcal = SACredentials.from_service_account_info(sa_info, scopes=SCOPES)
+            return cred_local, sa_gcal
+        except Exception:
+            logging.exception("Failed decoding SERVICE_ACCOUNT_JSON_B64; falling back.")
+    # 2. Raw JSON env
+    if SERVICE_ACCOUNT_JSON:
+        try:
+            sa_info = json.loads(SERVICE_ACCOUNT_JSON)
+            cred_local = credentials.Certificate(sa_info)
+            sa_gcal = SACredentials.from_service_account_info(sa_info, scopes=SCOPES)
+            return cred_local, sa_gcal
+        except Exception:
+            logging.exception("Failed parsing SERVICE_ACCOUNT_JSON; falling back to file.")
+    # 3. File path
+    if os.path.isdir(SA_PATH):
+        raise IsADirectoryError(f"SA_PATH points to a directory, expected file: {SA_PATH}")
+    cred_local = credentials.Certificate(SA_PATH)
+    sa_gcal = SACredentials.from_service_account_file(SA_PATH, scopes=SCOPES)
+    return cred_local, sa_gcal
+
+try:
+    cred, sa_creds = _load_service_account_credentials()
+except Exception:
+    logging.exception("Failed to load service account credentials (all strategies).")
+    raise
+
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 events_ref = db.collection("events")
@@ -47,9 +84,7 @@ intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Google Calendar service account creds
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
-sa_creds = SACredentials.from_service_account_file(SA_PATH, scopes=SCOPES)
+# Google Calendar creds already loaded as sa_creds
 
 def gcal():
     # Note: no domain-wide delegation needed because the target calendar
