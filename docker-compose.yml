@@ -8,16 +8,9 @@ services:
     image: registry.ieeeconcordia.ca/ieeeconcordia/new-discord-bot:latest
     restart: unless-stopped
     environment:
-      # Provide these via Portainer or an .env file (not committed)
       DISCORD_TOKEN: "${DISCORD_TOKEN}"
       CALENDAR_ID: "${CALENDAR_ID}"
-      # Preferred: base64 of service account JSON placed in env var SERVICE_ACCOUNT_JSON_B64
-      #   macOS:  base64 -i serviceAccounts.json | tr -d '\n'
-      #   Linux:  base64 -w0 serviceAccounts.json
-      # Uncomment one of the following methods:
-      # SERVICE_ACCOUNT_JSON_B64: "${SERVICE_ACCOUNT_JSON_B64}"
-      # (Fallback) raw single-line JSON (minified) if base64 not used:
-      # SERVICE_ACCOUNT_JSON: "${SERVICE_ACCOUNT_JSON}"
+      SERVICE_ACCOUNT_JSON_B64: "${SERVICE_ACCOUNT_JSON_B64}"  # Uncomment this line
     logging:
       driver: "json-file"
       options:
