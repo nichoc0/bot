@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  discord-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Replace with your actual registry (example shown)
+    image: registry.ieeeconcordia.ca/ieeeconcordia/new-discord-bot:latest
+    restart: unless-stopped
+    environment:
+      # You can remove these if you use an env_file or Portainer UI vars
+      DISCORD_TOKEN: "${DISCORD_TOKEN}"
+      CALENDAR_ID: "${CALENDAR_ID}"
+      SA_PATH: "/app/serviceAccounts.json"
+    # Option 1 (local/dev): bind mount the service account JSON
+    volumes:
+      - ./serviceAccounts.json:/app/serviceAccounts.json:ro
+    # Option 2 (prod via Portainer): create a secret named serviceAccounts.json
+    # secrets:
+    #   - service_account_json
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Uncomment if using Docker secrets instead of a bind mount
+# secrets:
+#   service_account_json:
+#     file: ./serviceAccounts.json
+
+# Optional: use an .env file (NOT committed) to supply DISCORD_TOKEN, CALENDAR_ID
+# env_file:
+#   - .env
